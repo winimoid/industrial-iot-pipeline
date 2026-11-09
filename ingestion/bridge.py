@@ -7,7 +7,7 @@ import numpy as np
 from collections import defaultdict
 from datetime import datetime
 
-# ---------- Configuration ----------
+# ---------- configuration ----------
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC = "factory/machines/#"

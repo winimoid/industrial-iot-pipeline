@@ -5,7 +5,7 @@ import random
 import argparse
 from datetime import datetime, timezone
 
-# ---------- Configuration ----------
+# ---------- configuration ----------
 MACHINES = ['M1', 'M2', 'M3', 'M4', 'M5']
 SENSOR_KEYS = ['temperature_c', 'vibration_mm_s', 'current_a']
 INTERVAL = 2  # seconds between messages

@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+import os
 import time
 import json
 import random
@@ -11,6 +12,7 @@ SENSOR_KEYS = ['temperature_c', 'vibration_mm_s', 'current_a']
 INTERVAL = 2  # seconds between messages
 ANOMALY_CHANCE = 0.05  # 5% chance per sensor per reading
 ANOMALY_MULTIPLIER = (1.5, 3.0)  # spike range
+FAULT_DELTA_C = 25.0  # this is sustained overheating (when we want to simulate a fault oursef)
 
 # slightly different baseline values for each machine to mimic variation
 baselines = {
@@ -27,46 +29,99 @@ noise_std = {
     'current_a': 0.5,
 }
 
-def generate_reading(machine_id):
+def generate_reading(machine_id, fault_active=False, rng=random):
+    # add some noise to each reading
+    values = {k: baselines[machine_id][k] + rng.gauss(0, noise_std[k]) for k in SENSOR_KEYS}
+
+    injected_sensor = None
+
+    if fault_active:
+        # if we simulate a fault ourself we add overheating to temperature
+        values['temperature_c'] += FAULT_DELTA_C
+        injected_sensor = 'temperature_c'
+    elif rng.random() < ANOMALY_CHANCE:
+        # otherwise we randomly inject an anomaly into any sensor
+        injected_sensor = rng.choice(SENSOR_KEYS)
+
+        # values[injected_sensor] *= rng.uniform(ANOMALY_MULTIPLIER[0], ANOMALY_MULTIPLIER[1])
+        values[injected_sensor] *= rng.uniform(*ANOMALY_MULTIPLIER)
+
     payload = {
         'machine_id': machine_id,
-        'timestamp': datetime.now(timezone.utc).isoformat(),
-        'sensors': {},
-        'injected_anomaly': False,
+        'timestamp': datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        'sensors': {k: round(v, 2) for k, v in values.items()},
+        # 'injected_anomaly': injected_sensor != None,
+        'injected_anomaly': injected_sensor is not None,
+        'injected_sensor': injected_sensor
     }
-
-    for key in SENSOR_KEYS:
-        base = baselines[machine_id][key]
-        noise = random.gauss(0, noise_std[key])
-        value = base + noise
-
-        # inject anomaly?
-        if random.random() < ANOMALY_CHANCE:
-            factor = random.uniform(*ANOMALY_MULTIPLIER)
-            value *= factor
-            payload['injected_anomaly'] = True
-
-        payload['sensors'][key] = round(value, 2)
 
     return payload
 
+def fault_is_active(now_s, period_s, duration_s):
+    # fault is active at the end of the period
+    # for the fault to trigger,where we are now in the period must be greater 
+    # # than the durage where everything is ok
+    return period_s > 0 and (now_s % period_s) >= (period_s - duration_s)
+
+# custom connect with rety function every 2s
+def connect_with_retry(client, host, port):
+    while True:
+        try:
+            client.connect(host, port, keepalive=60)
+            return
+        except OSError as exception:
+            print(f"Broker {host}:{port} is not available ({exception}). retying after 2s...", flush=True)
+            time.sleep(2)
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--broker', default='localhost', help='MQTT broker address')
-    parser.add_argument('--port', type=int, default=1883, help='MQTT broker port')
+    parser.add_argument('--broker', default=os.getenv("MQTT_BROKER", "localhost"), help='MQTT broker address')
+    parser.add_argument('--port', type=int, default=int(os.getenv("MQTT_PORT", 1883)), help='MQTT broker port')
+    parser.add_argument('--interval', type=float, default=float(os.getenv("SIM_INTERVAL", 2)), 
+                        help='Interval between messages in seconds')
+    parser.add_argument("--fault-machine", choices=MACHINES, default=os.getenv("SIM_FAULT_MACHINE") or None, 
+                        help="Machine ID to simulate an overheating fault sustained")
+    parser.add_argument("--fault-period", type=int, default=600,
+                        help="Period of the fault cycles in seconds")
+    parser.add_argument("--fault-duration", type=int, default=150, 
+                        help="How many seconds the fault lasts")
     args = parser.parse_args()
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.connect(args.broker, args.port, 60)
+    connect_with_retry(client, args.broker, args.port)  # retry to connect ro broker
+    client.loop_start() # keep connection between broker and client alive
 
-    print(f"Simulator started. Publishing to {args.broker}:{args.port}...")
-    while True:
-        for machine in MACHINES:
-            data = generate_reading(machine)
-            topic = f"factory/machines/{machine}/telemetry"
-            client.publish(topic, json.dumps(data))
-            print(f"Published: {topic} -> {data['sensors']} (anomaly: {data['injected_anomaly']})")
-        time.sleep(INTERVAL)
+    print(f"Simulator started. Publishing to {args.broker}:{args.port} every {args.interval}s"
+          + (f", fault on {args.fault_machine}" if args.fault_machine else ""), flush=True)
+
+    # t_start = next_tick = time.time()
+    t_start = next_tick = time.monotonic()
+
+    try:
+        while True:
+            elapsed = time.monotonic() - t_start
+
+            for machine in MACHINES:
+
+                fault = machine == args.fault_machine and fault_is_active(elapsed, args.fault_period, 
+                                                                        args.fault_duration)
+                data = generate_reading(machine, fault_active=fault)
+                topic = f"factory/machines/{machine}/telemetry"
+                client.publish(topic, json.dumps(data))
+
+                # if an anomaly was injected print it
+                if data['injected_anomaly']:
+                    print(f"[anomaly] {machine} {data['injected_sensor']} -> {data['sensors']}", flush=True)
+
+            next_tick += args.interval # fixed the time drift
+            time.sleep(max(0.0, next_tick - time.monotonic()))  # avoid negative time
+    except KeyboardInterrupt:
+        print("keyboard interrupt, stopping simulator...")
+    finally:
+        # we stop the keep alive and disconect finally
+        client.loop_stop()
+        client.disconnect()
 
 if __name__ == '__main__':
     main()

@@ -6,6 +6,12 @@ import random
 import argparse
 from datetime import datetime, timezone
 
+try:  # local dev mode run the file without aspetting for docker
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # ---------- configuration ----------
 MACHINES = ['M1', 'M2', 'M3', 'M4', 'M5']
 SENSOR_KEYS = ['temperature_c', 'vibration_mm_s', 'current_a']

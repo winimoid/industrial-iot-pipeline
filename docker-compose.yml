@@ -17,4 +17,44 @@ services:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_ADMIN_USER:-admin}
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-dev-only-password-do-not-share}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-factory}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
+      DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUXDB_RETENTION:-7d}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-dev-only-teken-do-not-share-or-else-i-am-cooked}
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  simulator:
+    build: ./simulator
+    container_name: simulator
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: ${MQTT_PORT:-1883}
+    # command: ["python", "-u", "sensor_sim.py", "--fault-machine", "M3"]
+    command: ["python", "-u", "sensor_sim.py"]
+    depends_on:
+      mosquitto: {condition: service_started}
+    restart: unless-stopped
+
+  bridge:
+    build: ./ingestion
+    container_name: bridge
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_TOPICS: "${MQTT_TOPICS:-factory/machines/#}"
+      # INFLUXDB_URL: "${INFLUXDB_URL:-http://influxdb:8086}"
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-dev-only-token-do-not-share-or-else-i-am-cooked}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-factory}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
+      ANOMALY_WINDOW: ${ANOMALY_WINDOW:-30}
+      ANOMALY_THRESHOLD: ${ANOMALY_THRESHOLD:-3.5}
+    depends_on:
+      influxdb: {condition: service_healthy}
+      mosquitto: {condition: service_started}
     restart: unless-stopped

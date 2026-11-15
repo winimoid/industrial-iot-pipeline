@@ -6,11 +6,10 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import json
 import os
 import sys
-import numpy as np
-from collections import defaultdict
-from datetime import datetime, time, timezone
+import time
+from datetime import datetime, timezone
 
-from ingestion.anomaly import RollingDetector
+from anomaly import RollingDetector
 
 try:  # local dev mode run the file without aspetting for docker
     from dotenv import load_dotenv
@@ -23,6 +22,7 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 topics_string = os.getenv("MQTT_TOPICS", "factory/machines/#")
 MQTT_TOPICS = [t.strip() for t in topics_string.split(",") if t.strip()]
+print(f"MQTT topics: {MQTT_TOPICS}", flush=True)
 
 INFLUXDB_URL = os.getenv("INFLUXDB_URL", "http://localhost:8086")
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN", "my-token-i-won-t-share-with-you")

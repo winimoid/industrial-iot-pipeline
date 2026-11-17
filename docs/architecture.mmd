@@ -1,0 +1,26 @@
+flowchart LR
+    U["Operator<br/>browser"]
+    W["Webhook<br/>webhook.site"]
+    E["Project Edge Inference on Simulated IoT Device, planned"]
+
+    subgraph STACK["Docker Compose network"]
+        SIM["simulator<br/>5 machines x 3 sensors<br/>every 2 s<br/>random spikes + optional fault"]
+        MQ(["Mosquitto broker<br/>port 1883"])
+
+        subgraph BR["bridge (Python)"]
+            P["Parse and validate JSON"]
+            D["Rolling z-score detector<br/>per machine and sensor<br/>window 30, threshold 3.5"]
+            P --> D
+        end
+
+        DB[("InfluxDB 2.x<br/>port 8086<br/>bucket: telemetry")]
+        G["Grafana<br/>port 3001<br/>provisioned datasource<br/>dashboard + alert rule"]
+    end
+
+    SIM -->|"publish<br/>factory/machines/ID/telemetry"| MQ
+    MQ -->|"subscribe<br/>factory/machines/+/telemetry"| P
+    D -->|"sensor_reading<br/>anomaly_event"| DB
+    DB -->|"Flux queries"| G
+    G -->|"temperature above 90 C<br/>for 1 minute"| W
+    G --> U
+    E -.->|"factory/edge/..."| MQ

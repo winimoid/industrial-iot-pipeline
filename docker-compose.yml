@@ -44,7 +44,7 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1883}
     # command: ["python", "-u", "sensor_sim.py", "--fault-machine", "M3"]
     # we specify the faulty machine if we want to trigger grafana temp>90 celcius alert
-    command: ["python", "-u", "sensor_sim.py", "--fault-machine", "M3"]
+    command: ["python", "-u", "sensor_sim.py"]
     depends_on:
       mosquitto: {condition: service_started}
     restart: unless-stopped

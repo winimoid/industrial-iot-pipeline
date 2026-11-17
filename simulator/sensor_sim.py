@@ -35,7 +35,7 @@ noise_std = {
     'current_a': 0.5,
 }
 
-def generate_reading(machine_id, fault_active=False, rng=random):
+def generate_reading(machine_id, anomaly_chance=ANOMALY_CHANCE, fault_active=False, rng=random):
     # add some noise to each reading
     values = {k: baselines[machine_id][k] + rng.gauss(0, noise_std[k]) for k in SENSOR_KEYS}
 
@@ -45,7 +45,7 @@ def generate_reading(machine_id, fault_active=False, rng=random):
         # if we simulate a fault ourself we add overheating to temperature
         values['temperature_c'] += FAULT_DELTA_C
         injected_sensor = 'temperature_c'
-    elif rng.random() < ANOMALY_CHANCE:
+    elif rng.random() < anomaly_chance:
         # otherwise we randomly inject an anomaly into any sensor
         injected_sensor = rng.choice(SENSOR_KEYS)
 
@@ -112,7 +112,7 @@ def main():
 
                 fault = machine == args.fault_machine and fault_is_active(elapsed, args.fault_period, 
                                                                         args.fault_duration)
-                data = generate_reading(machine, fault_active=fault)
+                data = generate_reading(machine, anomaly_chance=ANOMALY_CHANCE, fault_active=fault)
                 topic = f"factory/machines/{machine}/telemetry"
                 client.publish(topic, json.dumps(data))
 

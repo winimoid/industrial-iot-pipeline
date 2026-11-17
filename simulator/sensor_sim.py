@@ -87,7 +87,7 @@ def main():
     parser.add_argument('--interval', type=float, default=float(os.getenv("SIM_INTERVAL", 2)), 
                         help='Interval between messages in seconds')
     parser.add_argument("--fault-machine", choices=MACHINES, default=os.getenv("SIM_FAULT_MACHINE") or None, 
-                        help="Machine ID to simulate an overheating fault sustained")
+                        help="Machine ID to simulate an overheating fault sustained to test grafana alerts")
     parser.add_argument("--fault-period", type=int, default=600,
                         help="Period of the fault cycles in seconds")
     parser.add_argument("--fault-duration", type=int, default=150, 

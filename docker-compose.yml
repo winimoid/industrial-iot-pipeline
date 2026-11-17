@@ -7,6 +7,10 @@ services:
     image: eclipse-mosquitto:2
     container_name: mosquitto
     ports: ["1883:1883"]
+    # we inject mosquitto config and save waitlist msg into a docker vol
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
     restart: unless-stopped
 
   influxdb:
@@ -21,6 +25,10 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
       DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUXDB_RETENTION:-7d}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-dev-only-teken-do-not-share-or-else-i-am-cooked}
+    # we save influxdb data and config into vols
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
     healthcheck:
       test: ["CMD", "influx", "ping"]
       interval: 10s
@@ -35,7 +43,8 @@ services:
       MQTT_BROKER: mosquitto
       MQTT_PORT: ${MQTT_PORT:-1883}
     # command: ["python", "-u", "sensor_sim.py", "--fault-machine", "M3"]
-    command: ["python", "-u", "sensor_sim.py"]
+    # we specify the faulty machine if we want to trigger grafana temp>90 celcius alert
+    command: ["python", "-u", "sensor_sim.py", "--fault-machine", "M3"]
     depends_on:
       mosquitto: {condition: service_started}
     restart: unless-stopped
@@ -70,6 +79,17 @@ services:
       INFLUXDB_ORG: ${INFLUXDB_ORG:-factory}
       INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-dev-only-token-do-not-share-or-else-i-am-cooked}
+    # we save grafana data internal state and configs into volum
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       influxdb: {condition: service_healthy}
     restart: unless-stopped
+
+volumes:
+  mosquitto-data:
+  influxdb-data:
+  influxdb-config:
+  grafana-data:

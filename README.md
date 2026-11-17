@@ -11,7 +11,7 @@ tests/test_bridge_logic.py::test_anomaly_event_is_added_for_a_spike PASSED      
 tests/test_bridge_logic.py::test_garbage_values_are_skipped_not_crashing PASSED                                   [ 75%]
 tests/test_bridge_logic.py::test_bad_timestamp_falls_back_to_now_and_does_not_raise PASSED 
 
-# graphana dashboard
+
 
 Data model: measurement `sensor_reading` (tag `machine_id`; fields `temperature_c`, `vibration_mm_s`, `current_a`)
 and measurement `anomaly_event` (tags `machine_id`, `sensor`; fields `value`, `expected_mean`, `expected_std`, `z_score`, `injected`).
@@ -80,4 +80,11 @@ from(bucket: "telemetry")
    starting the stack the rule should go Pending -> Firing and webhook.site shows the POST.
 
 ## 6. Export for the repo
-Dashboard -> **Export -> Export as JSON** 
+Dashboard -> **Export -> Export as JSON** (leave "Export for sharing externally" **OFF**, so the fixed datasource uid
+is kept) -> save as `grafana/dashboards/factory-overview.json`. On the next `docker compose up` it loads by itself.
+
+
+in docker-compose.yml # command: ["python", "-u", "sensor_sim.py", "--fault-machine", "M3"]
+    # we specify the faulty machine if we want to trigger grafana temp>90 celcius alert
+
+l'erreur se trouve dans factory-overview.json, chaque panneau pointe encore vers l'ancien identifiant aléatoire "uid": "cg4gju3ybgnwgc", alors que la nouvelle source de données créée par le provisioning utilise l'identifiant fixe "uid": "influxdb-telemetry".

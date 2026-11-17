@@ -11,7 +11,10 @@ tests/test_bridge_logic.py::test_anomaly_event_is_added_for_a_spike PASSED      
 tests/test_bridge_logic.py::test_garbage_values_are_skipped_not_crashing PASSED                                   [ 75%]
 tests/test_bridge_logic.py::test_bad_timestamp_falls_back_to_now_and_does_not_raise PASSED 
 
+# Building the dashboard (Flux queries, copy-paste)
 
+Data source **InfluxDB** is provisioned automatically (Flux, uid `influxdb-telemetry`).
+Open http://localhost:3001 (admin / admin) -> **Dashboards -> New -> New dashboard -> Add visualization**.
 
 Data model: measurement `sensor_reading` (tag `machine_id`; fields `temperature_c`, `vibration_mm_s`, `current_a`)
 and measurement `anomaly_event` (tags `machine_id`, `sensor`; fields `value`, `expected_mean`, `expected_std`, `z_score`, `injected`).
@@ -88,3 +91,31 @@ in docker-compose.yml # command: ["python", "-u", "sensor_sim.py", "--fault-mach
     # we specify the faulty machine if we want to trigger grafana temp>90 celcius alert
 
 l'erreur se trouve dans factory-overview.json, chaque panneau pointe encore vers l'ancien identifiant aléatoire "uid": "cg4gju3ybgnwgc", alors que la nouvelle source de données créée par le provisioning utilise l'identifiant fixe "uid": "influxdb-telemetry".
+
+
+evaluate_detector.py results in terminal : 
+
+(venv) PS D:\Projects\industrial-intelligent-systems-portfolio\industrial-iot-pipeline> python -m evaluate_detector
+| window | threshold | precision | recall |     F1 | false alarms / machine / hour |
+|-------:|----------:|----------:|-------:|-------:|------------------------------:|
+|     10 |       2.5 |     0.273 |  0.929 |  0.422 |                         224.3 |
+|     10 |         3 |     0.434 |  0.906 |  0.587 |                         107.0 |
+|     10 |       3.5 |     0.608 |  0.885 |  0.721 |                          51.8 |
+|     10 |         4 |     0.758 |  0.866 |  0.808 |                          25.1 |
+|     20 |       2.5 |     0.444 |  0.921 |  0.599 |                         104.7 |
+|     20 |         3 |     0.679 |  0.891 |  0.771 |                          38.2 |
+|     20 |       3.5 |     0.848 |  0.860 |  0.854 |                          14.0 |
+|     20 |         4 |     0.940 |  0.830 |  0.882 |                           4.8 |
+|     30 |       2.5 |     0.541 |  0.921 |  0.681 |                          70.9 |
+|     30 |         3 |     0.778 |  0.889 |  0.830 |                          23.0 |
+|     30 |       3.5 |     0.918 |  0.851 |  0.883 |                           6.9 |
+|     30 |         4 |     0.974 |  0.813 |  0.887 |                           1.9 |
+|     60 |       2.5 |     0.720 |  0.927 |  0.811 |                          32.6 |
+|     60 |         3 |     0.897 |  0.885 |  0.891 |                           9.2 |
+|     60 |       3.5 |     0.970 |  0.842 |  0.901 |                           2.4 |
+|     60 |         4 |     0.995 |  0.800 |  0.887 |                           0.4 |
+(venv) PS D:\Projects\industrial-intelligent-systems-portfolio\industrial-iot-pipeline> 
+
+conclusion the bigger the window, the better the results in terms of false alarms
+
+but with window=30 and threshold=3 we can already start to see some good results
